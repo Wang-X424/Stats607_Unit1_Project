@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cnn-neuron-alignment"
+version = "1.0.0"
+description = "Neuron alignment of a two-layer CNN trained by gradient descent: simulations and MNIST"
+requires-python = ">=3.10"
+dependencies = ["numpy", "matplotlib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: runs the full base configuration (about 10 s)"]

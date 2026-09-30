@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: cnn-neuron-alignment
+Version: 1.0.0
+Summary: Neuron alignment of a two-layer CNN trained by gradient descent: simulations and MNIST
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: matplotlib

@@ -1,0 +1,12 @@
+pyproject.toml
+src/alignment/__init__.py
+src/alignment/config.py
+src/alignment/io.py
+src/alignment/metrics.py
+src/alignment/mnist.py
+src/alignment/model.py
+src/cnn_neuron_alignment.egg-info/PKG-INFO
+src/cnn_neuron_alignment.egg-info/SOURCES.txt
+src/cnn_neuron_alignment.egg-info/dependency_links.txt
+src/cnn_neuron_alignment.egg-info/requires.txt
+src/cnn_neuron_alignment.egg-info/top_level.txt
