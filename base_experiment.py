@@ -1,11 +1,11 @@
 """Base experiment (Fig. 2): five snapshots of the filters projected onto the signal plane
 (initialization, end of alignment, after fitting, and the two midpoints) and, separately, the
-loss curve with the measured alignment time and t_2. The snapshots come in two versions: filters
+loss curve with the measured t_1 and t_2. The snapshots come in two versions: filters
 normalized to unit norm before projection (directions only) and raw projections (norms visible)."""
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from common_modified import base_run, landmarks, first_iter, round_iter, class_angle, BASE, FIGS
+from common import base_run, landmarks, first_iter, round_iter, class_angle, BASE, FIGS
 
 COLORS = {'pos_data': 'tab:blue', 'neg_data': 'tab:orange',
           'pos_filter': 'tab:green', 'neg_filter': 'tab:red', 'dead': 'lightgrey'}
@@ -36,9 +36,9 @@ def draw_plane(ax, log, i, normalized, lim):
 
 def main():
     log = base_run()
-    t_align, t2 = landmarks(log)
+    t_1, t2 = landmarks(log)
     t_end = first_iter(log, log['loss'] <= 0.05, int(log['iter'][-1]))
-    k0, k1, k2 = 0, round_iter(t_align, log), round_iter(t_end, log)
+    k0, k1, k2 = 0, round_iter(t_1, log), round_iter(t_end, log)
     # k0 = 0
     # k1 = 
     # k2 =
@@ -121,7 +121,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(4.8, 2.8))
     ax.plot(log['iter'], log['loss'], color='tab:blue')
-    for k, name in [(t_align, r'$\hat t_{\rm align}$'), (t2, r'$\hat t_2$')]:
+    for k, name in [(t_1, r'$\hat t_1$'), (t2, r'$\hat t_2$')]:
         ax.axvline(k, color='k', ls='--', lw=0.8)
         ax.annotate(f'{name} = {k}', (k, 1.02), rotation=90, va='bottom', ha='right', fontsize=9)
     ax.set(xlabel='iteration', ylabel='training loss', ylim=(0, 1.35))
@@ -143,7 +143,7 @@ def main():
 
     alive = log['alive'][-1]
     t_S = first_iter(log, log['fracS'] >= alive.mean(), None)     # every live filter in S_+/S_-
-    print(f't_align = {t_align} (all live filters inside their class cone); every live filter in S+/S- '
+    print(f't_1 = {t_1} (all live filters inside their class cone); every live filter in S+/S- '
           f'from iteration {t_S}; t_2 = {t2}; loss <= 0.05 from {t_end}; snapshots at {snapshots}; '
           f'final loss = {log["loss"][-1]:.3g}; '
           f'{(~alive).sum()} of {len(alive)} filters activate no signal patch; '

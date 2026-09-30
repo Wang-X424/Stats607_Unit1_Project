@@ -139,14 +139,14 @@ def class_angle(log, cfg):
 def landmarks(log, cfg=BASE):
     """Measured alignment time and t_2. A filter that activates no signal patch at the end is
     'dead': its gradient lies in the noise subspace, so its signal-plane direction is frozen for
-    good (the analogue of MMV's S_dead). t_align is the first iteration at which every other
+    good (the analogue of MMV's S_dead). t_1 is the first iteration at which every other
     filter points inside the cone of its class (angle <= alpha = theta_star/2); t_2 the first at
     which Q_+ and Q_- both exceed b0."""
     alive = log['alive'][-1]
     inside = class_angle(log, cfg)[:, alive] <= cfg['theta_deg'] / 2
-    t_align = first_iter(log, inside.all(1), int(log['iter'][-1]))
+    t_1 = first_iter(log, inside.all(1), int(log['iter'][-1]))
     t2 = first_iter(log, (log['Qp'] >= cfg['b0']) & (log['Qm'] >= cfg['b0']), int(log['iter'][-1]))
-    return t_align, t2
+    return t_1, t2
 
 
 def run_one(cfg, seed):
@@ -166,11 +166,11 @@ def base_run(seed=0):
 
 
 def landmark_iters():
-    """The four iterations at which the sweeps are read out: roughly t_align/2, t_align and t_2
+    """The four iterations at which the sweeps are read out: roughly t_1/2, t_1 and t_2
     of the base run (rounded to multiples of ROUND), and the last iteration."""
     log = base_run()
-    t_align, t2 = landmarks(log)
-    return [round_iter(t_align / 2, log), round_iter(t_align, log), round_iter(t2, log), int(log['iter'][-1])]
+    t_1, t2 = landmarks(log)
+    return [round_iter(t_1 / 2, log), round_iter(t_1, log), round_iter(t2, log), int(log['iter'][-1])]
 
 
 def run_sweep(name, seeds=range(5)):
