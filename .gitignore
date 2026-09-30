@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# environment
+.venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# outputs of the original scripts (regenerated, never committed)
+/figs/
+/results/
+/data/
