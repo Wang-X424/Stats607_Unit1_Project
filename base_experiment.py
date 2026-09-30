@@ -1,11 +1,11 @@
 """Base experiment (Fig. 2): five snapshots of the filters projected onto the signal plane
 (initialization, end of alignment, after fitting, and the two midpoints) and, separately, the
-loss curve with the measured t_1 and t_2. The snapshots come in two versions: filters
+loss curve with the measured alignment time and t_2. The snapshots come in two versions: filters
 normalized to unit norm before projection (directions only) and raw projections (norms visible)."""
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from common import base_run, landmarks, first_iter, round_iter, class_angle, BASE, FIGS
+from common_modified import base_run, landmarks, first_iter, round_iter, class_angle, BASE, FIGS
 
 COLORS = {'pos_data': 'tab:blue', 'neg_data': 'tab:orange',
           'pos_filter': 'tab:green', 'neg_filter': 'tab:red', 'dead': 'lightgrey'}

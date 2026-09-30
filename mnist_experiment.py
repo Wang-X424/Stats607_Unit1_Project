@@ -1,10 +1,13 @@
-"""Real data: MNIST digits 0 vs 1 (Section 5, main text). Images are centred, cut into
-non-overlapping patches, and the common axis u_star is the normalized difference of the two pooled
-class axes. Trains the same network with the same GD as the simulations and plots the mean
-alignment with u_star and the training loss."""
+"""Real data: MNIST digits 0 vs 1 (Section 5, main text). Images are centred as in MMV and cut
+into non-overlapping patches; no patch is designated as signal or noise. The class axes u_+ and
+u_- are the normalized pooled sums of the positive / negative patches, and u_star their
+normalized difference. Trains the same network with the same GD as the simulations and plots,
+per second-layer sign, the alignment of the filters with u_+ / u_- and the training loss.
+Usage: python mnist_experiment.py [patch_size]   (patch_size in {4, 7, 14, 28}; default 14)"""
 import gzip
 import os
 import struct
+import sys
 import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +19,7 @@ FILES = {'images': 'train-images-idx3-ubyte.gz', 'labels': 'train-labels-idx1-ub
 
 CFG = dict(BASE, h=50, init_scale=1e-6, eta=2e-3, iters=15_000, log_every=20,
            n_per_class=1000, patch=14)          # 14x14 patches -> P = 4, D = 196
+COLORS = {'pos': 'tab:green', 'neg': 'tab:red'}
 
 
 def download(name):
@@ -56,11 +60,11 @@ def load_mnist_01(cfg, rng):
     return X, y
 
 
-def common_axis(X, y):
-    """u_star = (u_+ - u_-)/||.||, with u_+/- the normalized pooled class sums of the patches."""
+def class_axes(X, y):
+    """u_+, u_-: normalized pooled sums of the positive / negative patches; u_star = (u_+ - u_-)/||.||."""
     u = np.stack([X[y > 0].sum((0, 1)), X[y < 0].sum((0, 1))])
     u /= np.linalg.norm(u, axis=1, keepdims=True)
-    return (u[0] - u[1]) / np.linalg.norm(u[0] - u[1])
+    return u[0], u[1], (u[0] - u[1]) / np.linalg.norm(u[0] - u[1])
 
 
 def geometry_report(X, y, u_star):
@@ -76,28 +80,50 @@ def geometry_report(X, y, u_star):
 
 
 def main():
+    if len(sys.argv) > 1:
+        CFG['patch'] = int(sys.argv[1])
     rng = np.random.default_rng(0)
     X, y = load_mnist_01(CFG, rng)
-    u_star = common_axis(X, y)
+    u_plus, u_minus, u_star = class_axes(X, y)
     geometry_report(X, y, u_star)
-    log = train(X, y, u_star, CFG, rng)
-    it, c = log['iter'], log['c']                       # c: (logs, h), cos(w_j, sgn(v_j) u_star)
+    log = train(X, y, u_star, CFG, rng, refs=np.stack([u_plus, u_minus], 1))
+    it, sgn, cref = log['iter'], log['sgn'], log['cref']        # cref: (logs, h, 2) = cos(w_j, u_+), cos(w_j, u_-)
+    tag = f"p{CFG['patch']}"
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3.6))
-    ax1.plot(it, c.mean(1), color='tab:blue')
-    ax1.fill_between(it, c.min(1), c.max(1), alpha=0.25)
-    ax1.set(xlabel='iteration', ylabel=r'$\cos(w_j,\ \mathrm{sgn}(v_j)\,u_\star)$', ylim=(-1.05, 1.05),
-            title='(a) alignment: mean and range over filters')
-    ax2.plot(it, log['loss'], color='tab:blue')
-    ax2.set(xlabel='iteration', ylabel='training loss', title='(b) loss curve', ylim=(0, 1.1))
+    # main figure: alignment per second-layer sign (mean and range over the filters of that sign), loss
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.6))
+    groups = [('pos', sgn > 0, cref[..., 0], r'(a) filters with $v_j>0$: $\cos(w_j,u_+)$'),
+              ('neg', sgn < 0, cref[..., 1], r'(b) filters with $v_j<0$: $\cos(w_j,u_-)$')]
+    for ax, (key, mask, cos, title) in zip(axes, groups):
+        vals = np.where(mask, cos, np.nan)
+        ax.plot(it, np.nanmean(vals, 1), color=COLORS[key])
+        ax.fill_between(it, np.nanmin(vals, 1), np.nanmax(vals, 1), color=COLORS[key], alpha=0.2)
+        ax.set(xlabel='iteration', ylabel='alignment', ylim=(-1.05, 1.05), title=title)
+    axes[2].plot(it, log['loss'], color='tab:blue')
+    axes[2].set(xlabel='iteration', ylabel='training loss', title='(c) loss curve', ylim=(0, 1.1))
     fig.tight_layout()
-    fig.savefig(os.path.join(FIGS, 'mnist_experiment.pdf'))
-    fig.savefig(os.path.join(FIGS, 'mnist_experiment.png'), dpi=150)
+    fig.savefig(os.path.join(FIGS, f'mnist_experiment_{tag}.pdf'))
+    fig.savefig(os.path.join(FIGS, f'mnist_experiment_{tag}.png'), dpi=150)
 
-    drop = first_iter(log, log['loss'] < 0.5 * log['loss'][0], 'never')
-    print(f'n = {len(y)}, P = {X.shape[1]}, D = {X.shape[2]}; mean alignment at the end {c[-1].mean():.3f} '
-          f'(min {c[-1].min():.3f}, max {c[-1].max():.3f}), peak of the mean {c.mean(1).max():.3f} at iteration '
-          f'{it[np.argmax(c.mean(1))]}; loss halves at iteration {drop}; final loss {log["loss"][-1]:.3g}')
+    # diagnostics (not for the paper): alignment with the fixed axis vs. with the moving,
+    # loss-weighted axis u_lam(t), and the stable rank of W
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3.6))
+    ax1.plot(it, log['c'].mean(1), label=r'fixed axis $u_\star$')
+    ax1.plot(it, log['c_lam'].mean(1), label=r'loss-weighted axis $u_\lambda(t)$')
+    ax1.set(xlabel='iteration', ylabel='mean alignment', ylim=(-1.05, 1.05))
+    ax1.legend(fontsize=8)
+    ax2.plot(it, log['srank'])
+    ax2.set(xlabel='iteration', ylabel=r'stable rank $\|W\|_F^2/\|W\|_2^2$')
+    fig.tight_layout()
+    fig.savefig(os.path.join(FIGS, f'mnist_diagnostics_{tag}.png'), dpi=150)
+
+    c, peak = log['c'].mean(1), int(np.argmax(log['c'].mean(1)))
+    print(f'n = {len(y)}, P = {X.shape[1]}, D = {X.shape[2]}, cos(u_+, u_-) = {u_plus @ u_minus:.3f}; '
+          f'mean alignment with u_star peaks at {c[peak]:.3f} (iteration {it[peak]}, loss {log["loss"][peak]:.3f}), '
+          f'ends at {c[-1]:.3f}; with the loss-weighted axis it ends at {log["c_lam"][-1].mean():.3f}; '
+          f'stable rank {log["srank"][peak]:.2f} at the peak, {log["srank"][-1]:.2f} at the end; '
+          f'loss halves at iteration {first_iter(log, log["loss"] < 0.5 * log["loss"][0], "never")}; '
+          f'final loss {log["loss"][-1]:.3g}')
 
 
 if __name__ == '__main__':
